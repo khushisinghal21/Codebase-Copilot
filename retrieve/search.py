@@ -62,6 +62,7 @@ def search(
     bm25_store: BM25Store | None = None,
     reranker: "Reranker | None" = None,
     k: int = 10,
+    repo_id: str | None = None,
 ) -> list[dict]:
     """
     Retrieve the top-k most relevant chunks for a query.
@@ -70,17 +71,20 @@ def search(
       1. Dense vector search (always)
       2. BM25 keyword search + RRF fusion (if bm25_store provided)
       3. Cross-encoder reranking of top candidates (if reranker provided)
+
+    repo_id: if set, restrict search to that repo only (Phase 6).
+             If None, searches across all indexed repos.
     """
     # Fetch more candidates if reranking — reranker needs material to work with
     fetch_k = min(k * 2, max(k + 5, 20)) if not reranker else max(k * 3, 20)
 
     query_embedding = embedder.embed_query(query)
-    dense_hits = store.query(query_embedding, k=fetch_k)
+    dense_hits = store.query(query_embedding, k=fetch_k, repo_id=repo_id)
 
     if bm25_store is None:
         candidates = dense_hits[:k]
     else:
-        bm25_hits = bm25_store.search(query, k=fetch_k)
+        bm25_hits = bm25_store.search(query, k=fetch_k, repo_id=repo_id)
         if not bm25_hits:
             candidates = dense_hits[:fetch_k]
         else:
@@ -91,4 +95,5 @@ def search(
         return reranker.rerank(query, candidates, top_n=k)
 
     return candidates[:k]
+
 

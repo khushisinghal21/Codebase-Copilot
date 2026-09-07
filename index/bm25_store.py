@@ -22,31 +22,43 @@ class BM25Store:
         self._setup()
 
     def _setup(self) -> None:
-        # FTS5 with porter stemmer for better recall on word variants
+        # Migration: if repo_id column is missing, drop and recreate
+        try:
+            self.conn.execute("SELECT repo_id FROM chunks_fts LIMIT 0")
+        except Exception:
+            self.conn.execute("DROP TABLE IF EXISTS chunks_fts")
+
         self.conn.execute(
             """
             CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
-                chunk_id,
                 text,
                 file_path UNINDEXED,
                 start_line UNINDEXED,
-                end_line UNINDEXED,
-                tokenize = 'porter ascii'
+                end_line   UNINDEXED,
+                symbol_name UNINDEXED,
+                repo_id    UNINDEXED
             )
             """
         )
         self.conn.commit()
 
-    def add_chunks(self, chunks: list[dict]) -> None:
-        """Insert or replace chunks in the FTS index."""
+    def add_chunks(self, chunks: list[dict], repo_id: str = "default") -> None:
+        """Insert chunks in the FTS index, tagged with repo_id."""
         rows = []
-        for i, c in enumerate(chunks):
-            chunk_id = f"{c['file_path']}:{c['start_line']}-{c['end_line']}:{i}"
+        for c in chunks:
             rows.append(
-                (chunk_id, c["text"], c["file_path"], c["start_line"], c["end_line"])
+                (
+                    c["text"],
+                    c["file_path"],
+                    c["start_line"],
+                    c["end_line"],
+                    c.get("symbol_name") or "",
+                    repo_id,
+                )
             )
         self.conn.executemany(
-            "INSERT OR REPLACE INTO chunks_fts VALUES (?, ?, ?, ?, ?)", rows
+            "INSERT INTO chunks_fts (text, file_path, start_line, end_line, symbol_name, repo_id) VALUES (?, ?, ?, ?, ?, ?)",
+            rows,
         )
         self.conn.commit()
 
@@ -64,33 +76,44 @@ class BM25Store:
         # Quote each token to treat it as a literal phrase
         return " OR ".join(f'"{t}"' for t in tokens)
 
-    def search(self, query: str, k: int = 10) -> list[dict]:
-        """Return top-k chunks matching the query by BM25 rank."""
-        fts_query = self._sanitize_query(query)
+    def search(self, query: str, k: int = 10, repo_id: str | None = None) -> list[dict]:
+        """
+        BM25 full-text search. Optionally filter by repo_id.
+        Returns up to k results sorted by BM25 rank.
+        """
+        safe_query = self._sanitize_query(query)
+        if not safe_query:
+            return []
+
+        repo_filter = f"AND repo_id = ?" if repo_id else ""
+        params = (safe_query, k) if not repo_id else (safe_query, repo_id, k)
+
         try:
             cursor = self.conn.execute(
-                """
-                SELECT file_path, start_line, end_line, text, rank
-                FROM chunks_fts
-                WHERE chunks_fts MATCH ?
-                ORDER BY rank
-                LIMIT ?
+                f"""
+                SELECT text, file_path, start_line, end_line, symbol_name, repo_id,
+                       rank
+                FROM   chunks_fts
+                WHERE  chunks_fts MATCH ? {repo_filter}
+                ORDER  BY rank
+                LIMIT  ?
                 """,
-                (fts_query, k),
+                params,
             )
-        except sqlite3.OperationalError:
-            # FTS5 syntax error — return empty rather than crashing
+        except Exception:
             return []
 
         hits = []
         for row in cursor:
             hits.append(
                 {
-                    "file_path": row[0],
-                    "start_line": row[1],
-                    "end_line": row[2],
-                    "text": row[3],
-                    "score": -row[4],   # FTS5 rank is negative; flip for consistency
+                    "text":        row[0],
+                    "file_path":   row[1],
+                    "start_line":  int(row[2]),
+                    "end_line":    int(row[3]),
+                    "symbol_name": row[4] or None,
+                    "repo_id":     row[5],
+                    "score":       -row[6],
                 }
             )
         return hits
@@ -106,6 +129,14 @@ class BM25Store:
         """
         cur = self.conn.execute(
             "DELETE FROM chunks_fts WHERE file_path = ?", (file_path,)
+        )
+        self.conn.commit()
+        return cur.rowcount
+
+    def delete_by_repo(self, repo_id: str) -> int:
+        """Delete all BM25 entries for the given repo."""
+        cur = self.conn.execute(
+            "DELETE FROM chunks_fts WHERE repo_id = ?", (repo_id,)
         )
         self.conn.commit()
         return cur.rowcount

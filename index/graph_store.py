@@ -130,6 +130,29 @@ class GraphStore:
             for r in cur
         ]
 
+    def get_all_symbols(self) -> list[dict]:
+        """Return every indexed symbol across all repos."""
+        cur = self.conn.execute(
+            "SELECT file_path, symbol_name, symbol_type, parent_class, start_line, end_line FROM symbols"
+        )
+        return [
+            {
+                "file_path": r[0], "symbol_name": r[1],
+                "symbol_type": r[2], "parent_class": r[3],
+                "start_line": r[4], "end_line": r[5],
+            }
+            for r in cur
+        ]
+
+    def get_all_calls(self) -> list[tuple]:
+        """Return all call edges as (caller_symbol, callee_name) pairs."""
+        cur = self.conn.execute("SELECT caller_symbol, callee_name FROM calls")
+        return [(r[0], r[1]) for r in cur]
+
+    def count_symbols(self) -> int:
+        """Total number of indexed symbols."""
+        return self.conn.execute("SELECT COUNT(*) FROM symbols").fetchone()[0]
+
     def reset(self) -> None:
         self.conn.executescript("DELETE FROM symbols; DELETE FROM calls;")
         self.conn.commit()
