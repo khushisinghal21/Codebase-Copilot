@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Codebase Copilot</title>
+  <meta name="description" content="AI-powered codebase intelligence — ask questions, trace call graphs, analyse change impact." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:         #0a0a12;
+      --surface:    #111122;
+      --surface2:   #1a1a2e;
+      --border:     rgba(255,255,255,0.07);
+      --purple:     #8b5cf6;
+      --purple-dim: #4c1d95;
+      --cyan:       #22d3ee;
+      --green:      #10b981;
+      --red:        #ef4444;
+      --yellow:     #f59e0b;
+      --text:       #e2e8f0;
+      --muted:      #64748b;
+      --radius:     12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 220px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px 12px;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px 24px;
+    }
+    .logo-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--purple), var(--cyan));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .logo-text { font-weight: 700; font-size: 15px; line-height: 1.2; }
+    .logo-text span { color: var(--purple); }
+
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-radius: 8px; cursor: pointer;
+      font-size: 14px; font-weight: 500; color: var(--muted);
+      transition: all 0.15s; border: none; background: none; width: 100%;
+      text-align: left;
+    }
+    .nav-item:hover { background: var(--surface2); color: var(--text); }
+    .nav-item.active {
+      background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(34,211,238,0.1));
+      color: var(--purple);
+      border: 1px solid rgba(139,92,246,0.3);
+    }
+    .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 12px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .sidebar-footer a { color: var(--purple); text-decoration: none; }
+
+    /* ── Main area ── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .topbar {
+      padding: 16px 28px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar-title { font-size: 18px; font-weight: 600; }
+    .topbar-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      display: inline-block; margin-right: 6px;
+    }
+    .status-badge {
+      font-size: 12px; color: var(--muted);
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    /* ── Panel ── */
+    .panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 28px;
+      display: none;
+    }
+    .panel.active { display: block; }
+
+    /* ── Chat panel ── */
+    .chat-panel {
+      flex: 1; display: none;
+      flex-direction: column; overflow: hidden;
+    }
+    .chat-panel.active { display: flex; }
+
+    .messages {
+      flex: 1; overflow-y: auto;
+      padding: 24px 28px;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+
+    .message { display: flex; gap: 14px; max-width: 820px; }
+    .message.user { flex-direction: row-reverse; align-self: flex-end; }
+
+    .avatar {
+      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .avatar.ai { background: linear-gradient(135deg, var(--purple), var(--cyan)); }
+    .avatar.user { background: var(--surface2); border: 1px solid var(--border); }
+
+    .bubble {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      font-size: 14px; line-height: 1.7;
+    }
+    .message.user .bubble {
+      background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(34,211,238,0.1));
+      border-color: rgba(139,92,246,0.3);
+    }
+
+    .chunks-list {
+      margin-top: 14px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .chunk-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--muted);
+    }
+    .chunk-pill .score { color: var(--cyan); }
+    .chunk-pill .repo { color: var(--purple); }
+
+    .input-bar {
+      padding: 16px 28px;
+      border-top: 1px solid var(--border);
+      display: flex; gap: 12px; align-items: flex-end;
+    }
+
+    .input-wrap {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      display: flex; gap: 10px; align-items: center;
+      transition: border-color 0.2s;
+    }
+    .input-wrap:focus-within { border-color: var(--purple); }
+
+    #question-input {
+      flex: 1; background: none; border: none; outline: none;
+      color: var(--text); font-family: 'Inter', sans-serif;
+      font-size: 14px; resize: none; max-height: 120px;
+    }
+    #question-input::placeholder { color: var(--muted); }
+
+    .repo-filter {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text);
+      font-family: 'Inter', sans-serif; font-size: 13px;
+      padding: 10px 12px; outline: none;
+    }
+    .repo-filter:focus { border-color: var(--purple); }
+
+    .send-btn {
+      background: linear-gradient(135deg, var(--purple), #6366f1);
+      border: none; border-radius: 10px;
+      padding: 12px 22px; color: white; font-weight: 600;
+      font-size: 14px; cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .send-btn:hover { opacity: 0.9; }
+    .send-btn:active { transform: scale(0.97); }
+    .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Index panel ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .card h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+    .card p { font-size: 14px; color: var(--muted); margin-bottom: 16px; }
+
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--muted); }
+    .form-group input {
+      width: 100%; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-family: 'Inter', sans-serif;
+      font-size: 14px; padding: 10px 14px; outline: none;
+    }
+    .form-group input:focus { border-color: var(--purple); }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border-radius: 8px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      border: none; transition: all 0.15s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--purple), #6366f1);
+      color: white;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .progress-bar {
+      height: 4px; background: var(--surface2); border-radius: 2px;
+      overflow: hidden; margin-top: 12px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--purple), var(--cyan));
+      border-radius: 2px;
+      transition: width 0.4s;
+      animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer {
+      0%   { opacity: 1; }
+      50%  { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
+
+    .alert {
+      padding: 12px 16px; border-radius: 8px; font-size: 14px;
+      display: flex; align-items: center; gap: 10px; margin-top: 12px;
+    }
+    .alert-success { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); color: var(--green); }
+    .alert-error   { background: rgba(239,68,68,0.1);  border: 1px solid rgba(239,68,68,0.3);  color: var(--red); }
+    .alert-info    { background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.3); color: var(--purple); }
+
+    /* ── Blast panel ── */
+    .blast-result { margin-top: 16px; }
+    .depth-layer {
+      border-left: 3px solid var(--purple);
+      padding: 10px 16px; margin-bottom: 10px;
+      background: var(--surface); border-radius: 0 8px 8px 0;
+    }
+    .depth-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .symbol-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .symbol-tag {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; padding: 3px 10px;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    }
+
+    .impact-score {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 16px; border-radius: 8px;
+      font-weight: 700; font-size: 20px;
+    }
+    .impact-low    { background: rgba(16,185,129,0.15); color: var(--green); }
+    .impact-medium { background: rgba(245,158,11,0.15); color: var(--yellow); }
+    .impact-high   { background: rgba(239,68,68,0.15);  color: var(--red); }
+
+    /* ── Onboard panel ── */
+    .layer-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+    }
+    .layer-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .layer-desc  { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+    .symbol-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+    }
+    .symbol-row:last-child { border-bottom: none; }
+    .symbol-name { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; flex: 1; }
+    .symbol-type { font-size: 11px; color: var(--cyan); text-transform: uppercase; letter-spacing: 0.05em; }
+    .symbol-file { font-size: 12px; color: var(--muted); }
+    .degree-badge { font-size: 11px; color: var(--purple); background: rgba(139,92,246,0.1); padding: 2px 8px; border-radius: 4px; }
+
+    .llm-guide {
+      background: var(--surface); border: 1px solid rgba(139,92,246,0.3);
+      border-radius: var(--radius); padding: 24px; margin-top: 20px;
+      font-size: 14px; line-height: 1.8; white-space: pre-wrap;
+    }
+
+    /* ── Repos panel ── */
+    .repos-table { width: 100%; border-collapse: collapse; }
+    .repos-table th {
+      text-align: left; padding: 10px 14px;
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+    }
+    .repos-table td {
+      padding: 14px; font-size: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .repos-table td:first-child { font-family: 'JetBrains Mono', monospace; color: var(--purple); }
+    .repos-table tr:hover td { background: var(--surface2); }
+
+    /* ── Loading ── */
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid rgba(139,92,246,0.3);
+      border-top-color: var(--purple);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Welcome ── */
+    .welcome {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px;
+      color: var(--muted); text-align: center;
+    }
+    .welcome-icon { font-size: 48px; margin-bottom: 8px; }
+    .welcome h2 { font-size: 22px; font-weight: 700; color: var(--text); }
+    .welcome p { font-size: 14px; max-width: 380px; }
+
+    .suggestion-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; }
+    .chip {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 20px; padding: 8px 16px;
+      font-size: 13px; cursor: pointer;
+      transition: all 0.15s; color: var(--text);
+    }
+    .chip:hover { border-color: var(--purple); color: var(--purple); }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">🤖</div>
+    <div class="logo-text">Codebase<br/><span>Copilot</span></div>
+  </div>
+
+  <button class="nav-item active" onclick="switchTab('ask')" id="nav-ask">
+    <span class="icon">💬</span> Ask
+  </button>
+  <button class="nav-item" onclick="switchTab('index')" id="nav-index">
+    <span class="icon">📦</span> Index Repo
+  </button>
+  <button class="nav-item" onclick="switchTab('blast')" id="nav-blast">
+    <span class="icon">💥</span> Blast Radius
+  </button>
+  <button class="nav-item" onclick="switchTab('onboard')" id="nav-onboard">
+    <span class="icon">📖</span> Onboarding
+  </button>
+  <button class="nav-item" onclick="switchTab('repos')" id="nav-repos">
+    <span class="icon">🗂️</span> Repos
+  </button>
+
+  <div class="sidebar-footer">
+    <a href="/docs" target="_blank">📄 API Docs</a> &nbsp;·&nbsp;
+    <a href="https://github.com/khushisinghal21/Codebase-Copilot" target="_blank">GitHub</a>
+  </div>
+</aside>
+
+<!-- ── Main ── -->
+<div class="main">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div>
+      <div class="topbar-title" id="topbar-title">Ask your codebase</div>
+      <div class="topbar-sub" id="topbar-sub">Hybrid retrieval · Call graph · Citation validation</div>
+    </div>
+    <div class="status-badge">
+      <span class="status-dot"></span> API connected
+    </div>
+  </div>
+
+  <!-- ── ASK panel ── -->
+  <div class="chat-panel active" id="panel-ask">
+    <div class="messages" id="messages">
+      <div class="welcome" id="welcome">
+        <div class="welcome-icon">🤖</div>
+        <h2>Ask your codebase anything</h2>
+        <p>Index a GitHub repo first, then ask questions in natural language.</p>
+        <div class="suggestion-chips">
+          <span class="chip" onclick="fillQuestion(this)">How does authentication work?</span>
+          <span class="chip" onclick="fillQuestion(this)">What calls chunk_file?</span>
+          <span class="chip" onclick="fillQuestion(this)">Where is the database set up?</span>
+          <span class="chip" onclick="fillQuestion(this)">Explain the retrieval pipeline</span>
+        </div>
+      </div>
+    </div>
+    <div class="input-bar">
+      <select class="repo-filter" id="repo-filter">
+        <option value="">All repos</option>
+      </select>
+      <div class="input-wrap">
+        <textarea id="question-input" rows="1" placeholder="Ask a question about your codebase..."
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendQuestion()}"
+          oninput="autoResize(this)"></textarea>
+      </div>
+      <button class="send-btn" onclick="sendQuestion()" id="send-btn">Send →</button>
+    </div>
+  </div>
+
+  <!-- ── INDEX panel ── -->
+  <div class="panel" id="panel-index">
+    <div class="card">
+      <h3>📦 Index a GitHub Repository</h3>
+      <p>Paste a public GitHub URL. We'll clone, chunk, embed, and build the call graph automatically.</p>
+      <div class="form-group">
+        <label>GitHub URL</label>
+        <input type="text" id="github-url" placeholder="https://github.com/org/repo" />
+      </div>
+      <div class="form-group">
+        <label>Repo name (optional)</label>
+        <input type="text" id="repo-name-input" placeholder="my-backend (defaults to folder name)" />
+      </div>
+      <button class="btn btn-primary" onclick="indexRepo()">⚡ Start Indexing</button>
+      <div id="index-status" style="display:none;margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- ── BLAST panel ── -->
+  <div class="panel" id="panel-blast">
+    <div class="card">
+      <h3>💥 Blast Radius Analysis</h3>
+      <p>Enter a function or class name to see every symbol that would be affected if you change it.</p>
+      <div class="form-group">
+        <label>Symbol name</label>
+        <input type="text" id="blast-symbol" placeholder="e.g. walk_repo, BM25Store, chunk_file" />
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-primary" onclick="runBlast(false)">🔍 Analyse</button>
+        <button class="btn btn-secondary" onclick="runBlast(true)">⚡ Fast (no LLM)</button>
+      </div>
+    </div>
+    <div id="blast-result"></div>
+  </div>
+
+  <!-- ── ONBOARD panel ── -->
+  <div class="panel" id="panel-onboard">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:700;">📖 Onboarding Guide</h2>
+        <p style="font-size:14px;color:var(--muted);margin-top:4px;">Dependency-ordered reading plan for new contributors.</p>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" onclick="loadOnboard(false)">🤖 With LLM Guide</button>
+        <button class="btn btn-secondary" onclick="loadOnboard(true)">⚡ Topology Only</button>
+      </div>
+    </div>
+    <div id="onboard-result"></div>
+  </div>
+
+  <!-- ── REPOS panel ── -->
+  <div class="panel" id="panel-repos">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:700;">🗂️ Indexed Repositories</h2>
+        <p style="font-size:14px;color:var(--muted);margin-top:4px;">All repos currently in the index.</p>
+      </div>
+      <button class="btn btn-secondary" onclick="loadRepos()">↻ Refresh</button>
+    </div>
+    <div class="card">
+      <table class="repos-table" id="repos-table">
+        <thead>
+          <tr>
+            <th>Repo ID</th><th>Chunks</th><th>Last Commit</th><th>Path</th>
+          </tr>
+        </thead>
+        <tbody id="repos-body">
+          <tr><td colspan="4" style="color:var(--muted);text-align:center;padding:24px;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = '';  // same origin
+let pollingInterval = null;
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+const tabs = {
+  ask:     { title: 'Ask your codebase',   sub: 'Hybrid retrieval · Call graph · Citation validation' },
+  index:   { title: 'Index a Repository',  sub: 'Clone, chunk, embed, and build a call graph' },
+  blast:   { title: 'Blast Radius',        sub: 'Estimate the impact of changing a symbol' },
+  onboard: { title: 'Onboarding Guide',    sub: 'Dependency-ordered reading plan for new contributors' },
+  repos:   { title: 'Indexed Repositories',sub: 'All repos in the current index' },
+};
+
+function switchTab(name) {
+  document.querySelectorAll('.panel, .chat-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`panel-${name}`).classList.add('active');
+  document.getElementById(`nav-${name}`).classList.add('active');
+  document.getElementById('topbar-title').textContent = tabs[name].title;
+  document.getElementById('topbar-sub').textContent   = tabs[name].sub;
+  if (name === 'repos') loadRepos();
+}
+
+// ── Auto-resize textarea ───────────────────────────────────────────────────
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function fillQuestion(el) {
+  document.getElementById('question-input').value = el.textContent;
+  document.getElementById('welcome')?.remove();
+}
+
+// ── Ask ───────────────────────────────────────────────────────────────────
+async function sendQuestion() {
+  const q = document.getElementById('question-input').value.trim();
+  if (!q) return;
+  const repo = document.getElementById('repo-filter').value;
+
+  document.getElementById('welcome')?.remove();
+  appendMessage('user', q);
+  document.getElementById('question-input').value = '';
+
+  const loadingId = appendMessage('ai', '<span class="spinner"></span> Thinking...');
+  document.getElementById('send-btn').disabled = true;
+
+  try {
+    const res = await fetch(`${API}/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: q, repo: repo || null }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.detail || 'Unknown error');
+
+    const chunksHtml = data.chunks.map(c => `
+      <div class="chunk-pill">
+        <span class="repo">${c.repo_id || '?'}</span>
+        <span>${c.file_path.split('/').slice(-2).join('/')}</span>
+        <span>${c.start_line}-${c.end_line}</span>
+        <span class="score">${c.score}</span>
+      </div>
+    `).join('');
+
+    const validBadge = data.citation_validation
+      ? `<div style="margin-top:10px;font-size:12px;color:${data.citation_validation.hallucinated ? 'var(--red)' : 'var(--green)'}">
+           ${data.citation_validation.hallucinated ? '⚠️ Possible hallucination detected' : '✅ All citations verified'}
+         </div>`
+      : '';
+
+    const rewriteNote = data.rewritten_query
+      ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">🔄 Query rewritten: <em>${data.rewritten_query}</em></div>`
+      : '';
+
+    updateMessage(loadingId, `
+      ${rewriteNote}
+      <div style="line-height:1.8">${data.answer.replace(/\n/g,'<br>')}</div>
+      <div class="chunks-list">${chunksHtml}</div>
+      ${validBadge}
+    `);
+  } catch(e) {
+    updateMessage(loadingId, `<span style="color:var(--red)">❌ ${e.message}</span>`);
+  } finally {
+    document.getElementById('send-btn').disabled = false;
+  }
+}
+
+let msgId = 0;
+function appendMessage(role, html) {
+  const id = `msg-${++msgId}`;
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = `message ${role}`;
+  div.id = id;
+  div.innerHTML = `
+    <div class="avatar ${role}">${role === 'ai' ? '🤖' : '👤'}</div>
+    <div class="bubble">${html}</div>
+  `;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return id;
+}
+
+function updateMessage(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.querySelector('.bubble').innerHTML = html;
+  document.getElementById('messages').scrollTop = 99999;
+}
+
+// ── Index ─────────────────────────────────────────────────────────────────
+async function indexRepo() {
+  const url  = document.getElementById('github-url').value.trim();
+  const name = document.getElementById('repo-name-input').value.trim() || null;
+  if (!url) return;
+
+  const statusEl = document.getElementById('index-status');
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = `<div class="alert alert-info"><span class="spinner"></span> Queuing indexing job...</div>`;
+
+  const res = await fetch(`${API}/index`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ github_url: url, repo_name: name }),
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    statusEl.innerHTML = `<div class="alert alert-error">❌ ${data.detail}</div>`;
+    return;
+  }
+
+  const repoName = data.repo_name;
+  statusEl.innerHTML = `
+    <div class="alert alert-info">
+      <span class="spinner"></span>
+      <span id="status-text">Cloning <strong>${repoName}</strong> from GitHub...</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:30%"></div></div>
+  `;
+
+  // Poll for status
+  if (pollingInterval) clearInterval(pollingInterval);
+  pollingInterval = setInterval(async () => {
+    const sr = await fetch(`${API}/index/status/${repoName}`);
+    const sd = await sr.json();
+    const txt = document.getElementById('status-text');
+    if (txt) txt.textContent = sd.message;
+
+    if (sd.status === 'done') {
+      clearInterval(pollingInterval);
+      statusEl.innerHTML = `<div class="alert alert-success">✅ ${sd.message}</div>`;
+      loadRepoFilter();
+    } else if (sd.status === 'error') {
+      clearInterval(pollingInterval);
+      statusEl.innerHTML = `<div class="alert alert-error">❌ ${sd.message}</div>`;
+    }
+  }, 2000);
+}
+
+// ── Blast radius ──────────────────────────────────────────────────────────
+async function runBlast(noLlm) {
+  const sym = document.getElementById('blast-symbol').value.trim();
+  if (!sym) return;
+
+  const el = document.getElementById('blast-result');
+  el.innerHTML = `<div class="card"><span class="spinner"></span> Analysing <code>${sym}</code>...</div>`;
+
+  const res = await fetch(`${API}/blast`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol: sym, no_llm: noLlm }),
+  });
+  const data = await res.json();
+  if (!res.ok) { el.innerHTML = `<div class="alert alert-error">❌ ${data.detail}</div>`; return; }
+
+  const pct = data.impact_pct;
+  const impactClass = pct < 10 ? 'impact-low' : pct < 30 ? 'impact-medium' : 'impact-high';
+  const impactLabel = pct < 10 ? 'LOW RISK' : pct < 30 ? 'MEDIUM RISK' : 'HIGH RISK';
+
+  const layersHtml = Object.entries(data.by_depth || {}).sort((a,b)=>a[0]-b[0]).map(([depth, syms]) => `
+    <div class="depth-layer">
+      <div class="depth-label">${depth === '1' ? 'Direct Callers' : `Depth ${depth}`}</div>
+      <div class="symbol-tags">
+        ${syms.map(s => `<span class="symbol-tag">${s}</span>`).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  const filesHtml = (data.affected_files || []).map(f =>
+    `<div style="font-size:13px;padding:4px 0;color:var(--muted);font-family:monospace">• ${f}</div>`
+  ).join('');
+
+  const llmHtml = data.llm_summary
+    ? `<div class="card" style="margin-top:16px;">
+         <h3>🤖 LLM Risk Assessment</h3>
+         <div style="font-size:14px;line-height:1.8;margin-top:12px;white-space:pre-wrap">${data.llm_summary}</div>
+       </div>`
+    : '';
+
+  el.innerHTML = `
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+        <div>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:4px;">Symbol</div>
+          <div style="font-family:monospace;font-size:18px;font-weight:700;">${data.symbol}</div>
+        </div>
+        <div>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:4px;">Impact</div>
+          <div class="impact-score ${impactClass}">${pct}% · ${impactLabel}</div>
+        </div>
+        <div>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:4px;">Affected</div>
+          <div style="font-size:18px;font-weight:700;">${data.affected_count} symbol(s) in ${data.affected_files?.length || 0} file(s)</div>
+        </div>
+      </div>
+      ${layersHtml}
+      <div style="margin-top:16px;"><strong>Affected files:</strong>${filesHtml}</div>
+    </div>
+    ${llmHtml}
+  `;
+}
+
+// ── Onboarding ────────────────────────────────────────────────────────────
+async function loadOnboard(noLlm) {
+  const el = document.getElementById('onboard-result');
+  el.innerHTML = `<div class="card"><span class="spinner"></span> Building dependency topology...</div>`;
+
+  const res = await fetch(`${API}/onboard?no_llm=${noLlm}`);
+  const data = await res.json();
+  if (!res.ok) { el.innerHTML = `<div class="alert alert-error">❌ ${data.detail}</div>`; return; }
+
+  const layerColors = ['#8b5cf6', '#22d3ee', '#10b981'];
+  const layersHtml = (data.layers || []).map((layer, i) => `
+    <div class="layer-card" style="border-top: 3px solid ${layerColors[i]}">
+      <div class="layer-title">${layer.name}</div>
+      <div class="layer-desc">${layer.description}</div>
+      ${(layer.symbols || []).map(s => `
+        <div class="symbol-row">
+          <div class="symbol-name">${s.symbol_name}</div>
+          <div class="symbol-type">${s.symbol_type}</div>
+          <div class="symbol-file">${s.file_path.split('/').slice(-1)[0]}</div>
+          <div class="degree-badge">↑${s.in_degree} ↓${s.out_degree}</div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+
+  const llmHtml = data.llm_guide
+    ? `<div class="llm-guide"><strong>🤖 LLM Onboarding Guide</strong>\n\n${data.llm_guide}</div>`
+    : '';
+
+  el.innerHTML = layersHtml + llmHtml;
+}
+
+// ── Repos ─────────────────────────────────────────────────────────────────
+async function loadRepos() {
+  const res = await fetch(`${API}/repos`);
+  const data = await res.json();
+  const tbody = document.getElementById('repos-body');
+  const repos = data.repos || [];
+
+  if (!repos.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:24px;">No repos indexed yet.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = repos.map(r => `
+    <tr>
+      <td>${r.repo_id}</td>
+      <td>${r.chunk_count}</td>
+      <td style="font-family:monospace;font-size:12px">${(r.last_commit||'—').slice(0,12)}</td>
+      <td style="color:var(--muted);font-size:12px">${r.repo_path}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadRepoFilter() {
+  const res = await fetch(`${API}/repos`);
+  const data = await res.json();
+  const sel = document.getElementById('repo-filter');
+  const repos = data.repos || [];
+  sel.innerHTML = '<option value="">All repos</option>' +
+    repos.map(r => `<option value="${r.repo_id}">${r.repo_id}</option>`).join('');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+loadRepoFilter();
+</script>
+</body>
+</html>
