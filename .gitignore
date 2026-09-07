@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+.copilot_index/
+.copilot_bm25.db
+.copilot_graph.db
+.env
+*.egg-info/
+.DS_Store

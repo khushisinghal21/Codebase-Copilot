@@ -1,0 +1,102 @@
+[
+  {
+    "question": "what does the walk_repo function do?",
+    "expected_file": "ingest/walk_repo.py",
+    "expected_symbol": "walk_repo"
+  },
+  {
+    "question": "how does fixed-size chunking work?",
+    "expected_file": "ingest/chunk.py",
+    "expected_symbol": "chunk_file"
+  },
+  {
+    "question": "what embedding model is used?",
+    "expected_file": "ingest/embed.py",
+    "expected_symbol": "Embedder"
+  },
+  {
+    "question": "how does the vector store save chunks?",
+    "expected_file": "index/store.py",
+    "expected_symbol": "add_chunks"
+  },
+  {
+    "question": "how does cosine similarity search work in the vector store?",
+    "expected_file": "index/store.py",
+    "expected_symbol": "query"
+  },
+  {
+    "question": "how is BM25 keyword search implemented?",
+    "expected_file": "index/bm25_store.py",
+    "expected_symbol": "search"
+  },
+  {
+    "question": "how does reciprocal rank fusion work?",
+    "expected_file": "retrieve/search.py",
+    "expected_symbol": "reciprocal_rank_fusion"
+  },
+  {
+    "question": "what is the low confidence threshold for refusing answers?",
+    "expected_file": "generate/answer.py",
+    "expected_symbol": "generate_answer"
+  },
+  {
+    "question": "how does the CLI index command work?",
+    "expected_file": "cli.py",
+    "expected_symbol": "cmd_index"
+  },
+  {
+    "question": "how does the CLI ask command work?",
+    "expected_file": "cli.py",
+    "expected_symbol": "cmd_ask"
+  },
+  {
+    "question": "how does the system prompt enforce citations?",
+    "expected_file": "generate/answer.py",
+    "expected_symbol": "generate_answer"
+  },
+  {
+    "question": "how does gitignore filtering work in walk_repo?",
+    "expected_file": "ingest/walk_repo.py",
+    "expected_symbol": "_load_gitignore"
+  },
+  {
+    "question": "what file extensions are indexed by default?",
+    "expected_file": "ingest/walk_repo.py",
+    "expected_symbol": "walk_repo"
+  },
+  {
+    "question": "how does AST chunking extract function boundaries?",
+    "expected_file": "ingest/chunk_ast.py",
+    "expected_symbol": "chunk_file"
+  },
+  {
+    "question": "how are class methods chunked separately?",
+    "expected_file": "ingest/chunk_ast.py",
+    "expected_symbol": "_chunk_class"
+  },
+  {
+    "question": "how does the embedder embed a query?",
+    "expected_file": "ingest/embed.py",
+    "expected_symbol": "embed_query"
+  },
+  {
+    "question": "how does chunk batching work during indexing?",
+    "expected_file": "cli.py",
+    "expected_symbol": "cmd_index"
+  },
+  {
+    "question": "how does BM25 query sanitization prevent syntax errors?",
+    "expected_file": "index/bm25_store.py",
+    "expected_symbol": "_sanitize_query"
+  },
+  {
+    "question": "what metadata is stored alongside each chunk in chromadb?",
+    "expected_file": "index/store.py",
+    "expected_symbol": "add_chunks"
+  },
+  {
+    "question": "how is the Groq API called to generate answers?",
+    "expected_file": "generate/answer.py",
+    "expected_symbol": "generate_answer"
+  }
+]
