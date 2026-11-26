@@ -34,6 +34,8 @@ from generate.answer import generate_answer
 from generate.validate import validate_citations, format_validation_report
 from analyze.blast_radius import compute_blast_radius, format_blast_radius, llm_impact_summary  # Phase 7
 from analyze.onboarding import build_reading_plan, generate_onboarding_guide, print_reading_plan  # Phase 7
+from memory import DEFAULT_MEMORY_DIR  # Phase 8
+from memory.transcripts import TranscriptLog, confirmed_from_citations
 
 load_dotenv()
 
@@ -226,9 +228,22 @@ def cmd_ask(args):
         except Exception as e:
             print(f"Reranker unavailable ({e}), skipping.", file=sys.stderr)
 
+    # Phase 8: dreamed memory (wiki sections + MEMORY.md index)
+    wiki_store, memory_index = None, ""
+    if args.use_memory:
+        from pathlib import Path as _P
+        from memory.wiki_store import WikiStore, WIKI_DB_FILE
+        from memory.dream import load_index
+        wiki_db = _P(args.memory_dir) / WIKI_DB_FILE
+        if wiki_db.exists():
+            wiki_store = WikiStore(str(wiki_db))
+            memory_index = load_index(args.memory_dir)
+        else:
+            print("No dreamed memory yet. Run `python cli.py dream <repo_path>` first.", file=sys.stderr)
+
     repo_id_filter = getattr(args, "repo", None)
     chunks = search(args.question, embedder, store, bm25_store=bm25, reranker=reranker,
-                    k=args.k, repo_id=repo_id_filter)
+                    k=args.k, repo_id=repo_id_filter, wiki_store=wiki_store)
 
     # Phase 4: graph expansion
     if not args.no_graph:
@@ -242,18 +257,51 @@ def cmd_ask(args):
         print(f"  {c['file_path']}:{c['start_line']}-{c['end_line']}  (score={c['score']:.3f}){symbol}{repo_tag}{graph_tag}")
     print()
 
-    answer = generate_answer(args.question, chunks)
+    answer = generate_answer(args.question, chunks, memory_context=memory_index)
 
     # Phase 4: citation validation
+    confirmed = []
     if not args.no_validate:
         report = validate_citations(answer, chunks)
         if report["hallucinated"]:
             answer = report["flagged_answer"]
         print(format_validation_report(report))
         print()
+        confirmed = confirmed_from_citations(chunks, report["valid"])
 
     print("--- Answer ---")
     print(answer)
+
+    # Phase 8: log the session so the next dream can learn from it
+    if not args.no_log:
+        session_id = TranscriptLog(args.memory_dir).log_session(args.question, chunks, confirmed)
+        print(f"\n(session {session_id} logged; if chunk N was the right answer, run "
+              f"`python cli.py feedback {session_id} N`)", file=sys.stderr)
+
+
+def cmd_dream(args):
+    """Phase 8: offline consolidation of transcripts into notes, wiki and MEMORY.md."""
+    from memory.dream import dream, format_report
+    report = dream(args.repo_path, memory_dir=args.memory_dir,
+                   max_index_lines=args.max_index_lines)
+    print(format_report(report))
+
+
+def cmd_feedback(args):
+    """Phase 8: confirm which retrieved chunk answered a past session."""
+    log = TranscriptLog(args.memory_dir)
+    session = next((s for s in log.read_all() if s["id"] == args.session_id), None)
+    if session is None:
+        print(f"No session {args.session_id} in {log.path}", file=sys.stderr)
+        sys.exit(1)
+    if not 1 <= args.rank <= len(session["retrieved"]):
+        print(f"Session has {len(session['retrieved'])} retrieved chunks; pick 1..{len(session['retrieved'])}",
+              file=sys.stderr)
+        sys.exit(1)
+    chunk = session["retrieved"][args.rank - 1]
+    log.add_confirmation(args.session_id, chunk)
+    print(f"Confirmed {chunk['file_path']}:{chunk['start_line']}-{chunk['end_line']} "
+          f"for \"{session['question']}\". It will be consolidated on the next dream.")
 
 
 def cmd_repos(args):
@@ -387,7 +435,35 @@ def main():
         "--repo", default=None,
         help="Filter results to a specific repo (Phase 6). Omit to search all repos."
     )
+    ask_parser.add_argument(
+        "--use-memory", action="store_true",
+        help="Fuse dreamed wiki sections into retrieval and inject MEMORY.md (Phase 8)"
+    )
+    ask_parser.add_argument(
+        "--no-log", action="store_true", help="Don't log this session to transcripts (Phase 8)"
+    )
+    ask_parser.add_argument(
+        "--memory-dir", default=DEFAULT_MEMORY_DIR, help="Where memory is stored (Phase 8)"
+    )
     ask_parser.set_defaults(func=cmd_ask)
+
+    # ── dream / feedback (Phase 8) ────────────────────────────────────────────
+    dream_parser = subparsers.add_parser(
+        "dream", help="Offline pass: consolidate transcripts into notes, wiki and MEMORY.md"
+    )
+    dream_parser.add_argument("repo_path", help="Path to the indexed repo (used to verify notes)")
+    dream_parser.add_argument("--memory-dir", default=DEFAULT_MEMORY_DIR)
+    dream_parser.add_argument("--max-index-lines", type=int, default=150,
+                              help="Cap for the always-injected MEMORY.md")
+    dream_parser.set_defaults(func=cmd_dream)
+
+    feedback_parser = subparsers.add_parser(
+        "feedback", help="Mark which retrieved chunk answered a past session"
+    )
+    feedback_parser.add_argument("session_id")
+    feedback_parser.add_argument("rank", type=int, help="1-based rank of the right chunk")
+    feedback_parser.add_argument("--memory-dir", default=DEFAULT_MEMORY_DIR)
+    feedback_parser.set_defaults(func=cmd_feedback)
 
     # ── repos (Phase 6) ───────────────────────────────────────────────────────
     repos_parser = subparsers.add_parser("repos", help="List all indexed repos")

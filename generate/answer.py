@@ -41,7 +41,12 @@ def _format_chunks(chunks: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
-def generate_answer(query: str, chunks: list[dict], api_key: str | None = None) -> str:
+def generate_answer(
+    query: str,
+    chunks: list[dict],
+    api_key: str | None = None,
+    memory_context: str = "",
+) -> str:
     if not chunks:
         return "I couldn't find any relevant code for this question in the index."
 
@@ -70,6 +75,15 @@ def generate_answer(query: str, chunks: list[dict], api_key: str | None = None) 
 Code excerpts:
 
 {_format_chunks(chunks)}"""
+
+    # Phase 8: the small MEMORY.md index from the last dream. It is a map, not
+    # evidence: citations must still point at the code excerpts above.
+    if memory_context:
+        user_message = (
+            "Codebase memory (a map from past sessions; may be out of date, "
+            "never cite it, cite the code excerpts):\n\n"
+            f"{memory_context}\n\n{user_message}"
+        )
 
     response = client.chat.completions.create(
         model=MODEL,

@@ -2,7 +2,7 @@
 
 A local, privacy-first AI assistant that deeply understands your codebase. Ask natural language questions, trace call graphs, estimate change impact, and onboard new contributors — all from the CLI.
 
-> Built in 7 progressive phases, from basic RAG to a full code intelligence platform.
+> Built in 8 progressive phases, from basic RAG to a code intelligence platform with memory that improves between sessions.
 
 ---
 
@@ -17,10 +17,12 @@ A local, privacy-first AI assistant that deeply understands your codebase. Ask n
 | List indexed repos | `python cli.py repos` |
 | Blast radius — who breaks if I change X? | `python cli.py blast walk_repo` |
 | Onboarding guide for new contributors | `python cli.py onboard` |
+| Consolidate past sessions into memory ("dream") | `python cli.py dream /path/to/repo` |
+| Ask with dreamed memory | `python cli.py ask "..." --use-memory` |
 
 ---
 
-## 🏗️ Architecture — 7 Phases
+## 🏗️ Architecture — 8 Phases
 
 ```
 User Query
@@ -89,6 +91,34 @@ User Query
 ### Phase 7 — Code Intelligence
 - **Blast Radius** — BFS through callers to estimate how many symbols/files break if you change a function. Layered by depth + LLM risk rating.
 - **Onboarding Mode** — Topological sort of the dependency graph produces a Foundation → Core → Entry Point reading order. LLM writes a personalized guide.
+
+### Phase 8 — Memory with offline "dreaming"
+Inspired by Anthropic's [The components of agent memory](https://www.anthropic.com/engineering/components-of-agent-memory).
+
+Memory is stored in layers. The bottom ones are kept raw; the top ones stay small:
+
+| Layer | File | What it holds |
+|---|---|---|
+| Transcripts | `.copilot_memory/transcripts.jsonl` | Every `ask`: question, retrieved chunks, chunks confirmed as the answer (validated citations or `cli.py feedback`) |
+| Notes | `notes.json` | Which symbol answered which question, and how far down search had ranked it |
+| Wiki | `wiki/*.md` + `wiki.db` | One linked page per file: module purpose, symbols, call links, past questions. Indexed per symbol section |
+| Injected index | `MEMORY.md` | Map of modules, most-asked symbols, search blind spots. Capped (150 lines by default) because it is added to every answer |
+
+`python cli.py dream <repo>` is the offline pass. It consolidates new transcripts into notes, **re-checks every note against the current code** (repointing ones whose symbol moved and dropping ones whose symbol is gone), rebuilds the wiki, rewrites `MEMORY.md`, and warns if the wiki grows larger than the source. It makes no LLM calls, so it is cheap enough to run after every commit.
+
+With `--use-memory`, retrieval adds the wiki as a third ranked list in RRF, and `MEMORY.md` is given to the LLM as a map (never as something to cite).
+
+**Results** (`eval/memory_results.md`): BM25 retriever, the 20-question gold set, leave-one-out, so no question is ever in its own memory:
+
+| Condition | recall@1 | recall@5 | MRR |
+|---|---|---|---|
+| Search alone | 0.45 | 0.70 | 0.589 |
+| Search + wiki (from code only) | 0.50 | 0.80 | 0.648 |
+| Search + wiki + memory | **0.60** | **0.85** | **0.715** |
+
+Stale-note test: after a refactor that shifted line numbers in 9 files and renamed one function, 15/15 notes pointed at the wrong lines. One dream repointed 14 and dropped the renamed one, leaving 0 wrong.
+
+Caveats: 20 questions is a small eval; recall@10 dipped from 0.95 to 0.90 because the wiki pushed one low-ranked correct chunk out of the top 10; the gold set predates Phase 8 and the wiki weights were fixed before running it. The dense half of hybrid search was not run for these numbers. Run `python eval/run_memory_eval.py --stale-test` to reproduce with the full hybrid retriever.
 
 ---
 
@@ -193,9 +223,16 @@ codebase-copilot/
 │   ├── blast_radius.py      # Change impact BFS analyser
 │   └── onboarding.py        # Topological reading-order generator
 │
+├── memory/                  # Agent memory (Phase 8)
+│   ├── transcripts.py       # Raw session log (ground truth)
+│   ├── codemap.py           # Current symbols, docstrings, call edges
+│   ├── dream.py             # Offline pass: notes, verification, wiki, MEMORY.md
+│   └── wiki_store.py        # FTS5 index over wiki sections
+│
 └── eval/                    # Evaluation suite (Phase 3)
-    ├── gold_set.json         # 10 query → expected file pairs
-    └── run_eval.py           # Computes recall@k and MRR
+    ├── gold_set.json         # 20 query → expected file pairs
+    ├── run_eval.py           # Computes recall@k and MRR
+    └── run_memory_eval.py    # Memory vs plain search (Phase 8)
 ```
 
 ---
@@ -228,9 +265,15 @@ python cli.py blast <symbol_name> --no-llm  # Topology only (faster)
 python cli.py onboard                        # Reading guide + LLM narrative
 python cli.py onboard --no-llm              # Topology only (faster)
 
+# ── Memory (Phase 8) ──────────────────────────────────────────
+python cli.py dream <repo_path>              # Offline consolidation pass
+python cli.py ask "<question>" --use-memory  # Retrieve with the dreamed wiki
+python cli.py feedback <session_id> <rank>   # Confirm which chunk was right
+
 # ── Evaluation ────────────────────────────────────────────────
 python eval/run_eval.py                      # Full eval with reranker
 python eval/run_eval.py --no-rerank         # Phase 2 baseline
+python eval/run_memory_eval.py --stale-test # Memory vs plain search (Phase 8)
 ```
 
 ---

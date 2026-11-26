@@ -118,6 +118,38 @@ class BM25Store:
             )
         return hits
 
+    def get_symbol_chunks(
+        self, rel_path: str, symbol_name: str, repo_id: str | None = None
+    ) -> list[dict]:
+        """
+        Look up the chunk(s) for a symbol by file suffix + name (Phase 8).
+        Used to turn a wiki section back into the code chunk it describes.
+        """
+        suffix = "/" + rel_path.lstrip("/")
+        sql = """
+            SELECT text, file_path, start_line, end_line, symbol_name, repo_id
+            FROM   chunks_fts
+            WHERE  symbol_name = ?
+              AND  (file_path = ? OR substr(file_path, -length(?)) = ?)
+        """
+        params: list = [symbol_name, rel_path, suffix, suffix]
+        if repo_id:
+            sql += " AND repo_id = ?"
+            params.append(repo_id)
+        rows = self.conn.execute(sql, params).fetchall()
+        return [
+            {
+                "text": r[0],
+                "file_path": r[1],
+                "start_line": int(r[2]),
+                "end_line": int(r[3]),
+                "symbol_name": r[4] or None,
+                "repo_id": r[5],
+                "score": 0.0,
+            }
+            for r in rows
+        ]
+
     def reset(self) -> None:
         self.conn.execute("DELETE FROM chunks_fts")
         self.conn.commit()

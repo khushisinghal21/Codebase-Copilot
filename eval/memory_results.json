@@ -1,0 +1,276 @@
+{
+  "corpus": "codebase-copilot @ a8b3916 (pre-Phase-8 snapshot)",
+  "retriever": "bm25",
+  "k": 10,
+  "chunks": 117,
+  "questions": 20,
+  "summary": {
+    "search": {
+      "n": 20,
+      "recall@1": 0.45,
+      "recall@5": 0.7,
+      "recall@10": 0.95,
+      "mrr": 0.5887301587301588,
+      "top5_context_tokens": 1931
+    },
+    "wiki only (cold)": {
+      "n": 20,
+      "recall@1": 0.6,
+      "recall@5": 0.8,
+      "recall@10": 0.9,
+      "mrr": 0.7038095238095238,
+      "top5_context_tokens": 1330
+    },
+    "search + wiki (cold)": {
+      "n": 20,
+      "recall@1": 0.5,
+      "recall@5": 0.8,
+      "recall@10": 0.9,
+      "mrr": 0.6476190476190476,
+      "top5_context_tokens": 1729
+    },
+    "search + wiki + memory (LOO)": {
+      "n": 20,
+      "recall@1": 0.6,
+      "recall@5": 0.85,
+      "recall@10": 0.9,
+      "mrr": 0.7145833333333333,
+      "top5_context_tokens": 1869
+    }
+  },
+  "seen_unseen": {
+    "seen": {
+      "search": {
+        "n": 9,
+        "recall@1": 0.4444444444444444,
+        "recall@5": 0.5555555555555556,
+        "recall@10": 0.8888888888888888,
+        "mrr": 0.5220458553791887,
+        "top5_context_tokens": 1933
+      },
+      "search + wiki + memory (LOO)": {
+        "n": 9,
+        "recall@1": 0.4444444444444444,
+        "recall@5": 0.7777777777777778,
+        "recall@10": 0.7777777777777778,
+        "mrr": 0.5925925925925926,
+        "top5_context_tokens": 1858
+      }
+    },
+    "unseen": {
+      "search": {
+        "n": 11,
+        "recall@1": 0.45454545454545453,
+        "recall@5": 0.8181818181818182,
+        "recall@10": 1.0,
+        "mrr": 0.6432900432900432,
+        "top5_context_tokens": 1930
+      },
+      "search + wiki + memory (LOO)": {
+        "n": 11,
+        "recall@1": 0.7272727272727273,
+        "recall@5": 0.9090909090909091,
+        "recall@10": 1.0,
+        "mrr": 0.8143939393939394,
+        "top5_context_tokens": 1878
+      }
+    }
+  },
+  "per_question": [
+    {
+      "question": "what does the walk_repo function do?",
+      "search": 9,
+      "wiki only (cold)": 1,
+      "search + wiki (cold)": 3,
+      "search + wiki + memory (LOO)": 2,
+      "answer_seen_before": true
+    },
+    {
+      "question": "how does fixed-size chunking work?",
+      "search": 2,
+      "wiki only (cold)": 2,
+      "search + wiki (cold)": 2,
+      "search + wiki + memory (LOO)": 2,
+      "answer_seen_before": false
+    },
+    {
+      "question": "what embedding model is used?",
+      "search": 10,
+      "wiki only (cold)": 10,
+      "search + wiki (cold)": 7,
+      "search + wiki + memory (LOO)": 8,
+      "answer_seen_before": false
+    },
+    {
+      "question": "how does the vector store save chunks?",
+      "search": null,
+      "wiki only (cold)": 2,
+      "search + wiki (cold)": 7,
+      "search + wiki + memory (LOO)": null,
+      "answer_seen_before": true
+    },
+    {
+      "question": "how does cosine similarity search work in the vector store?",
+      "search": 2,
+      "wiki only (cold)": 1,
+      "search + wiki (cold)": 2,
+      "search + wiki + memory (LOO)": 1,
+      "answer_seen_before": false
+    },
+    {
+      "question": "how is BM25 keyword search implemented?",
+      "search": 2,
+      "wiki only (cold)": 1,
+      "search + wiki (cold)": 1,
+      "search + wiki + memory (LOO)": 1,
+      "answer_seen_before": false
+    },
+    {
+      "question": "how does reciprocal rank fusion work?",
+      "search": 1,
+      "wiki only (cold)": 1,
+      "search + wiki (cold)": 1,
+      "search + wiki + memory (LOO)": 1,
+      "answer_seen_before": false
+    },
+    {
+      "question": "what is the low confidence threshold for refusing answers?",
+      "search": 1,
+      "wiki only (cold)": 2,
+      "search + wiki (cold)": 1,
+      "search + wiki + memory (LOO)": 1,
+      "answer_seen_before": true
+    },
+    {
+      "question": "how does the CLI index command work?",
+      "search": 3,
+      "wiki only (cold)": 1,
+      "search + wiki (cold)": 1,
+      "search + wiki + memory (LOO)": 2,
+      "answer_seen_before": true
+    },
+    {
+      "question": "how does the CLI ask command work?",
+      "search": 1,
+      "wiki only (cold)": 1,
+      "search + wiki (cold)": 1,
+      "search + wiki + memory (LOO)": 1,
+      "answer_seen_before": false
+    },
+    {
+      "question": "how does the system prompt enforce citations?",
+      "search": 1,
+      "wiki only (cold)": 7,
+      "search + wiki (cold)": 2,
+      "search + wiki + memory (LOO)": 3,
+      "answer_seen_before": true
+    },
+    {
+      "question": "how does gitignore filtering work in walk_repo?",
+      "search": 1,
+      "wiki only (cold)": 1,
+      "search + wiki (cold)": 1,
+      "search + wiki + memory (LOO)": 1,
+      "answer_seen_before": false
+    },
+    {
+      "question": "what file extensions are indexed by default?",
+      "search": 1,
+      "wiki only (cold)": 1,
+      "search + wiki (cold)": 1,
+      "search + wiki + memory (LOO)": 1,
+      "answer_seen_before": true
+    },
+    {
+      "question": "how does AST chunking extract function boundaries?",
+      "search": 1,
+      "wiki only (cold)": 1,
+      "search + wiki (cold)": 1,
+      "search + wiki + memory (LOO)": 1,
+      "answer_seen_before": false
+    },
+    {
+      "question": "how are class methods chunked separately?",
+      "search": 7,
+      "wiki only (cold)": 3,
+      "search + wiki (cold)": 3,
+      "search + wiki + memory (LOO)": 3,
+      "answer_seen_before": false
+    },
+    {
+      "question": "how does the embedder embed a query?",
+      "search": 3,
+      "wiki only (cold)": 1,
+      "search + wiki (cold)": 2,
+      "search + wiki + memory (LOO)": 1,
+      "answer_seen_before": false
+    },
+    {
+      "question": "how does chunk batching work during indexing?",
+      "search": 9,
+      "wiki only (cold)": null,
+      "search + wiki (cold)": null,
+      "search + wiki + memory (LOO)": 1,
+      "answer_seen_before": true
+    },
+    {
+      "question": "how does BM25 query sanitization prevent syntax errors?",
+      "search": 1,
+      "wiki only (cold)": 1,
+      "search + wiki (cold)": 1,
+      "search + wiki + memory (LOO)": 1,
+      "answer_seen_before": false
+    },
+    {
+      "question": "what metadata is stored alongside each chunk in chromadb?",
+      "search": 7,
+      "wiki only (cold)": null,
+      "search + wiki (cold)": null,
+      "search + wiki + memory (LOO)": null,
+      "answer_seen_before": true
+    },
+    {
+      "question": "how is the Groq API called to generate answers?",
+      "search": 1,
+      "wiki only (cold)": 1,
+      "search + wiki (cold)": 1,
+      "search + wiki + memory (LOO)": 1,
+      "answer_seen_before": true
+    }
+  ],
+  "cold_dream": {
+    "wiki_pages": 24,
+    "wiki_sections": 117,
+    "wiki_to_source_ratio": 0.238,
+    "index_lines": 33,
+    "index_tokens_approx": 500,
+    "seconds": 0.09
+  },
+  "full_dream": {
+    "notes": 15,
+    "wiki_to_source_ratio": 0.249,
+    "index_lines": 53,
+    "index_tokens_approx": 795,
+    "seconds": 0.09
+  },
+  "memory_index_preview": "# Codebase memory\n_Generated by dream.py. Do not edit; it is rebuilt from transcripts and code._\n\n## Modules\n\n- `analyze/blast_radius.py`: Phase 7a: Blast Radius Analysis.\n- `analyze/onboarding.py`: Phase 7b: Onboarding Mode \u2014 Guided Reading Order for New Contributors.\n- `api/main.py`: FastAPI backend for Codebase Copilot.\n- `cli.py`: CLI for the Codebase Intelligence Copilot (Phase 5).\n- `eval/run_eval.py`: Evaluation script: measures retrieval quality against the gold set.\n- `generate/answer.py`: Generation: turn retrieved chunks into a grounded answer with mandatory path:line citation\n- `generate/validate.py`: Phase 4: Post-generation citation validator.\n- `index/bm25_store.py`: BM25 keyword index using SQLite FTS5.\n- `index/graph_store.py`: SQLite-backed call graph store.\n- `index/repo_registry.py`: Phase 6: Repo registry \u2014 tracks every repo that has been indexed.\n- `index/store.py`: Vector store wrapper around ChromaDB.\n- `ingest/call_graph.py`: Phase 4: Extract function call edges from Python source using tree-sitter.\n- `ingest/chunk.py`: Phase 1 chunking: fixed-size line windows with overlap.\n- `ingest/chunk_ast.py`: Phase 2 chunking: AST-aware chunking using tree-sitter.\n- `ingest/diff_indexer.py`: Phase 5: Incremental re-indexing via git diff.\n- `ingest/embed.py`: Embedding wrapper.\n- `ingest/import_parser.py`: Phase 6: Parse Python import statements to detect cross-repo dependencies.\n- `ingest/walk_repo.py`: Walk a repository and yield the paths of files worth index",
+  "stale_test": {
+    "notes": 15,
+    "files_refactored": 9,
+    "renamed": "ingest/chunk_ast.py::_chunk_class -> _chunk_class_v2",
+    "wrong_line_refs_before_dream": 15,
+    "repointed": 14,
+    "dropped": 1,
+    "wrong_line_refs_after_dream": 0,
+    "example_repoint": {
+      "symbol": "walk_repo",
+      "from": "ingest/walk_repo.py:31-64",
+      "to": "ingest/walk_repo.py:36-69"
+    },
+    "example_drop": {
+      "symbol": "_chunk_class",
+      "was": "ingest/chunk_ast.py:69-97",
+      "reason": "symbol no longer exists"
+    }
+  }
+}
